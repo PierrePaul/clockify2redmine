@@ -1,0 +1,4 @@
+__pycache__
+geckodriver.log
+config_local.py
+.idea
