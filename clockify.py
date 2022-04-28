@@ -1,8 +1,12 @@
+import logging
 from typing import Optional
+from logging import log
 from requests import get
 from datetime import datetime, timedelta
+from utils import pr
 import dateutil.parser
 import pytz
+import re
 
 from config import CLOCKIFY_TOKEN, CLOCKIFY_WID, CLOCKIFY_UID
 import math
@@ -23,6 +27,15 @@ def get_redmine_project_name(entry) -> Optional[str]:
     return None
 
 
+def get_task_id(entry) -> Optional[int]:
+    description = entry.get('description')
+    matches = re.search(r'#(\d+)', description)
+    if matches is not None:
+        return int(matches.group(1))
+
+    return None
+
+
 def get_date(time_entry) -> str:
     te_date = dateutil.parser.parse(time_entry.get('timeInterval').get('start'))
     return te_date.strftime('%Y-%m-%d')
@@ -33,7 +46,6 @@ def get_start_end(te) -> tuple:
     if te.get('timeInterval').get('end'):
         end = dateutil.parser.parse(te.get('timeInterval').get('end'))
     else:
-        # end = datetime.now().replace(tzinfo=timezone('Canada/Eastern'))
         py = pytz.timezone('Canada/Eastern')
         end = datetime.now()
         end = py.localize(end)
@@ -58,14 +70,22 @@ def report(employee_id=None, iso_start=None, iso_end=None):
     for te in data:
         project_name = get_redmine_project_name(te)
         if project_name is not None:
+            task_id = get_task_id(te)
             start, end = get_start_end(te)
             te_date = get_date(te)
-            if project_name not in totals:
-                totals[project_name] = {}
-            if te_date not in totals[project_name]:
-                totals[project_name][te_date] = timedelta()
 
-            totals[project_name][te_date] = totals[project_name][te_date] + (end - start)
+            if task_id is None:
+                log(logging.ERROR, f"At least one clockify time entry from project {project_name} on date {te_date} has no task_id associated.")
+            else:
+                # We want to end up with totals[my_project][2022-01-01][12341] = 0
+                if project_name not in totals:
+                    totals[project_name] = {}
+                if te_date not in totals[project_name]:
+                    totals[project_name][te_date] = {}
+                if task_id not in totals[project_name][te_date]:
+                    totals[project_name][te_date][task_id] = timedelta()
+
+                totals[project_name][te_date][task_id] = totals[project_name][te_date][task_id] + (end - start)
 
     return totals
 
@@ -75,7 +95,7 @@ def ceil(number):
 
 
 def prior_week_end():
-    return datetime.utcnow() - timedelta(days=((datetime.now().isoweekday()) % 7))
+    return datetime.utcnow() - timedelta(days=((datetime.now().isoweekday()) % 7) + 7)
 
 
 def prior_week_start():
