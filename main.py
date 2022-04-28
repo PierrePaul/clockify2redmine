@@ -1,5 +1,7 @@
-from pomerium import get_pomerium_cookie
 from clockify import report
+from redmine import get_time_entries
+from utils import pr
 
-# cookie = get_pomerium_cookie()
-print(report())
+entries = get_time_entries('lyxn-portal-build')
+pr(entries)
+# print(report())

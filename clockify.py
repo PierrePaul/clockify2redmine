@@ -1,24 +1,49 @@
+from typing import Optional
 from requests import get
 from datetime import datetime, timedelta
-from pprint import PrettyPrinter
 import dateutil.parser
 import pytz
 
 from config import CLOCKIFY_TOKEN, CLOCKIFY_WID, CLOCKIFY_UID
 import math
 
-pp = PrettyPrinter(indent=4)
+redmine_project_delimiter = 'redmine: '
+
 api_url = 'https://api.clockify.me/api/v1/'
 
 
-def pr(something):
-    pp.pprint(something)
+def get_redmine_project_name(entry) -> Optional[str]:
+    project = entry.get('project')
+    if project is not None:
+        project_notes = project.get('note', '').splitlines()
+        for project_note in project_notes:
+            if redmine_project_delimiter in project_note:
+                return project_note.lstrip(redmine_project_delimiter)
+
+    return None
+
+
+def get_date(time_entry) -> str:
+    te_date = dateutil.parser.parse(time_entry.get('timeInterval').get('start'))
+    return te_date.strftime('%Y-%m-%d')
+
+
+def get_start_end(te) -> tuple:
+    start = dateutil.parser.parse(te.get('timeInterval').get('start'))
+    if te.get('timeInterval').get('end'):
+        end = dateutil.parser.parse(te.get('timeInterval').get('end'))
+    else:
+        # end = datetime.now().replace(tzinfo=timezone('Canada/Eastern'))
+        py = pytz.timezone('Canada/Eastern')
+        end = datetime.now()
+        end = py.localize(end)
+
+    return start, end
 
 
 def report(employee_id=None, iso_start=None, iso_end=None):
     if employee_id is None:
         employee_id = CLOCKIFY_UID
-
     if iso_start is None:
         iso_start = prior_week_end().isoformat() + 'Z'
     if iso_end is None:
@@ -31,26 +56,16 @@ def report(employee_id=None, iso_start=None, iso_end=None):
     data = r.json()
     totals = {}
     for te in data:
-        client = 'No client'
-        project = 'No project'
-        if te.get('project') is not None:
-            client = te.get('project').get('clientName', 'No client')
-            project = te.get('project').get('name', 'No project')
+        project_name = get_redmine_project_name(te)
+        if project_name is not None:
+            start, end = get_start_end(te)
+            te_date = get_date(te)
+            if project_name not in totals:
+                totals[project_name] = {}
+            if te_date not in totals[project_name]:
+                totals[project_name][te_date] = timedelta()
 
-        start = dateutil.parser.parse(te.get('timeInterval').get('start'))
-        if te.get('timeInterval').get('end'):
-            end = dateutil.parser.parse(te.get('timeInterval').get('end'))
-        else:
-            # end = datetime.now().replace(tzinfo=timezone('Canada/Eastern'))
-            py = pytz.timezone('Canada/Eastern')
-            end = datetime.now()
-            end = py.localize(end)
-        if client not in totals:
-            totals[client] = {}
-        if project not in totals[client]:
-            totals[client][project] = timedelta()
-
-        totals[client][project] = totals[client][project] + (end - start)
+            totals[project_name][te_date] = totals[project_name][te_date] + (end - start)
 
     return totals
 
