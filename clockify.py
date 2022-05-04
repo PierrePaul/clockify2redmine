@@ -2,13 +2,11 @@ import logging
 from typing import Optional
 from logging import log
 from requests import get
-from datetime import datetime, timedelta
-from utils import pr, get_date, prior_week_start, prior_week_end, ceil, get_start_end
-import pytz
+from datetime import datetime
+from utils import get_date,prior_week_end, get_start_end
 import re
 
 from config import CLOCKIFY_TOKEN, CLOCKIFY_WID, CLOCKIFY_UID
-import math
 
 redmine_project_delimiter = 'redmine: '
 

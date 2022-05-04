@@ -2,7 +2,6 @@ import requests
 from dateutil import parser
 from pomerium import get_pomerium_cookie
 from config import REDMINE_URL, REDMINE_TOKEN, REDMINE_UID
-from datetime import timedelta
 from utils import pr
 
 s = requests.session()
@@ -20,6 +19,7 @@ def get_time_entries(date_start: str, date_end: str) -> list:
     )
     print(REDMINE_URL + f'/time_entries.json?user_id={str(REDMINE_UID)}&from={date_start}&to={date_end}')
     return response.json().get('time_entries')
+
 
 def redmine_format(redmine_entries: list):
     ex = [{
@@ -49,5 +49,25 @@ def redmine_format(redmine_entries: list):
 
             formatted_entries[project_id][date_][task_id] += entry.get('hours')
 
-    pr(formatted_entries)
     return formatted_entries
+
+
+def get_total(time_entries) -> float:
+    total = 0
+    for time_entry in time_entries:
+        total += time_entry.get('hours')
+    return total
+
+
+def create_entry(issue_id, spent_on, hours):
+    xml_entity = f"<time_entry><issue_id>{issue_id}</issue_id><user_id>{REDMINE_UID}</user_id><hours>{hours}</hours><comments>Autosync clockify</comments><spent_on>{spent_on}</spent_on></time_entry>"
+    pr(xml_entity)
+    response = s.post(
+        REDMINE_URL + f'/time_entries.xml',
+        data=xml_entity,
+        headers={'Content-Type': 'application/xml'}
+    )
+    pr(response.text)
+    pr(response.status_code)
+    return response.status_code
+
