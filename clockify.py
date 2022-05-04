@@ -3,8 +3,7 @@ from typing import Optional
 from logging import log
 from requests import get
 from datetime import datetime, timedelta
-from utils import pr
-import dateutil.parser
+from utils import pr, get_date, prior_week_start, prior_week_end, ceil, get_start_end
 import pytz
 import re
 
@@ -16,13 +15,13 @@ redmine_project_delimiter = 'redmine: '
 api_url = 'https://api.clockify.me/api/v1/'
 
 
-def get_redmine_project_name(entry) -> Optional[str]:
+def get_redmine_project_name(entry) -> Optional[int]:
     project = entry.get('project')
     if project is not None:
         project_notes = project.get('note', '').splitlines()
         for project_note in project_notes:
             if redmine_project_delimiter in project_note:
-                return project_note.lstrip(redmine_project_delimiter)
+                return int(project_note.lstrip(redmine_project_delimiter))
 
     return None
 
@@ -34,23 +33,6 @@ def get_task_id(entry) -> Optional[int]:
         return int(matches.group(1))
 
     return None
-
-
-def get_date(time_entry) -> str:
-    te_date = dateutil.parser.parse(time_entry.get('timeInterval').get('start'))
-    return te_date.strftime('%Y-%m-%d')
-
-
-def get_start_end(te) -> tuple:
-    start = dateutil.parser.parse(te.get('timeInterval').get('start'))
-    if te.get('timeInterval').get('end'):
-        end = dateutil.parser.parse(te.get('timeInterval').get('end'))
-    else:
-        py = pytz.timezone('Canada/Eastern')
-        end = datetime.now()
-        end = py.localize(end)
-
-    return start, end
 
 
 def report(employee_id=None, iso_start=None, iso_end=None):
@@ -83,21 +65,12 @@ def report(employee_id=None, iso_start=None, iso_end=None):
                 if te_date not in totals[project_name]:
                     totals[project_name][te_date] = {}
                 if task_id not in totals[project_name][te_date]:
-                    totals[project_name][te_date][task_id] = timedelta()
+                    totals[project_name][te_date][task_id] = 0
 
-                totals[project_name][te_date][task_id] = totals[project_name][te_date][task_id] + (end - start)
+                total = end - start
+                hours, remainder = divmod(total.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                total_formatted = hours + round(minutes/60, 2)
+                totals[project_name][te_date][task_id] += total_formatted
 
     return totals
-
-
-def ceil(number):
-    return math.ceil(number*100)/100
-
-
-def prior_week_end():
-    return datetime.utcnow() - timedelta(days=((datetime.now().isoweekday()) % 7) + 7)
-
-
-def prior_week_start():
-    return datetime.utcnow() - timedelta(weeks=1, days=(datetime.now().isoweekday()))
-
