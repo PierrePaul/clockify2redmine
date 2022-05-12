@@ -39,7 +39,7 @@ def redmine_format(redmine_entries: list):
         project_id = entry.get('project', {}).get('id')
         task_id = entry.get('issue', {}).get('id')
         user_id = entry.get('user', {}).get('id')
-        if str(user_id) == REDMINE_UID:
+        if int(user_id) == REDMINE_UID:
             if project_id not in formatted_entries:
                 formatted_entries[project_id] = {}
             if date_ not in formatted_entries[project_id]:

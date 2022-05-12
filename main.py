@@ -16,6 +16,7 @@ if __name__ == '__main__':
     date_end = date_end + timedelta(hours=24)
 
     redmine_entries = get_time_entries(date_start.strftime('%Y-%m-%d'), date_end.strftime('%Y-%m-%d'))
+    pr(redmine_entries)
     redmine_entries = redmine_format(redmine_entries)
 
     pr(redmine_entries)
@@ -24,10 +25,10 @@ if __name__ == '__main__':
     for project_id, entries in clockify_entries.items():
         for date_, task in entries.items():
             for task_id, total in task.items():
-                pr(redmine_entries[project_id][date_])
                 if project_id in redmine_entries \
                         and date_ in redmine_entries[project_id] \
                         and task_id in redmine_entries[project_id][date_]:
+                    pr(("weee found something", task_id, date_))
                     diff = total - redmine_entries[project_id][date_][task_id]
                     if diff > 0:
                         print('need to create redmine task')
